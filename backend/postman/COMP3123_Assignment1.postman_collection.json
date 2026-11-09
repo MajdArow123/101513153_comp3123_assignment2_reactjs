@@ -1,0 +1,2036 @@
+{
+  "info": {
+    "name": "COMP3123 Assignment 1",
+    "description": "Employee management REST API (Node.js, Express, MongoDB).\n\nRun the folders in order: Health -> Signup -> Login -> Employees (User A) -> Cross-user ownership.\nSet {{baseUrl}} to http://localhost:3000 (local) or your Vercel URL.\n\nRate limits: signup and login allow AUTH_RATE_LIMIT_MAX requests per window per IP (default 5).\nThe Signup folder alone sends 8 requests, so for a full collection run set AUTH_RATE_LIMIT_MAX=10 in .env and restart the server.\nThe limit is kept in memory: restart the server before running the collection again.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "description": "Service health check (no auth).",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Has health fields\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b).to.include.keys(\"status\", \"uptime\", \"timestamp\", \"environment\", \"database\");",
+                  "pm.expect(b.database).to.eql(\"connected\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Signup",
+      "description": "POST /api/v1/user/signup. Users A and B are the fixed test accounts used by the rest of the collection.",
+      "item": [
+        {
+          "name": "Signup - User A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userA_username}}\",\n  \"email\": \"{{userA_email}}\",\n  \"password\": \"{{userA_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"User A created (201) or already exists from a previous run (409)\", () => {",
+                  "pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});",
+                  "if (pm.response.code === 201) pm.test(\"Password is not returned\", () => pm.expect(pm.response.json().data).to.not.have.property(\"password\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - User B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userB_username}}\",\n  \"email\": \"{{userB_email}}\",\n  \"password\": \"{{userB_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"User B created (201) or already exists from a previous run (409)\", () => {",
+                  "pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});",
+                  "if (pm.response.code === 201) pm.test(\"Password is not returned\", () => pm.expect(pm.response.json().data).to.not.have.property(\"password\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - valid (new user)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"email\": \"{{newEmail}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A fresh username every run, so this request always demonstrates 201.",
+                  "const id = Date.now().toString().slice(-8);",
+                  "pm.collectionVariables.set(\"newUsername\", \"user_\" + id);",
+                  "pm.collectionVariables.set(\"newEmail\", \"user_\" + id + \"@example.com\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Returns user without password\", () => {",
+                  "const u = pm.response.json().data;",
+                  "pm.expect(u).to.have.property(\"_id\");",
+                  "pm.expect(u.username).to.eql(pm.collectionVariables.get(\"newUsername\"));",
+                  "pm.expect(u).to.not.have.property(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - duplicate username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userA_username}}\",\n  \"email\": \"another.email@example.com\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'username'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"username\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - duplicate email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"another_username\",\n  \"email\": \"{{userA_email}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'email'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - invalid email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"invalid_email_user\",\n  \"email\": \"not-an-email\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'email'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - weak password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"weak_pw_user\",\n  \"email\": \"weak.pw@example.com\",\n  \"password\": \"password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'password'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Signup - missing fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'username'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"username\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'email'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"email\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'password'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Login",
+      "description": "POST /api/v1/user/login. Accepts {username, password} OR {email, password}. Successful logins save the JWT into {{tokenA}} / {{tokenB}}.",
+      "item": [
+        {
+          "name": "Login - User A (username)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userA_username}}\",\n  \"password\": \"{{userA_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Returns a JWT\", () => pm.expect(pm.response.json().data.token).to.be.a(\"string\").and.not.empty);",
+                  "if (pm.response.code === 200) {",
+                  "pm.collectionVariables.set(\"tokenA\", pm.response.json().data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - User B (email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userB_email}}\",\n  \"password\": \"{{userB_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Returns a JWT\", () => pm.expect(pm.response.json().data.token).to.be.a(\"string\").and.not.empty);",
+                  "if (pm.response.code === 200) {",
+                  "pm.collectionVariables.set(\"tokenB\", pm.response.json().data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - invalid credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userA_username}}\",\n  \"password\": \"WrongPassword1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Generic message (does not reveal which part was wrong)\", () => {",
+                  "pm.expect(pm.response.json().message).to.eql(\"Invalid credentials\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - missing credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'password'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - rate limit (429)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "description": "Run this LAST in the Login folder: it uses up the login limit for 15 minutes (restart the server to reset). The pre-request script sends failed logins until the limit is reached, then this request must get 429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"rate_limit_demo\",\n  \"password\": \"WrongPassword1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Keep sending failed logins until the server answers 429 (max 30 tries).",
+                  "const send = (n) => {",
+                  "  if (n > 30) return;",
+                  "  pm.sendRequest({",
+                  "    url: pm.variables.get(\"baseUrl\") + \"/api/v1/user/login\",",
+                  "    method: \"POST\",",
+                  "    header: { \"Content-Type\": \"application/json\" },",
+                  "    body: { mode: \"raw\", raw: JSON.stringify({ username: \"rate_limit_demo\", password: \"WrongPassword1\" }) }",
+                  "  }, (err, res) => {",
+                  "    if (!err && res.code !== 429) send(n + 1);",
+                  "  });",
+                  "};",
+                  "send(1);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 429\", () => pm.response.to.have.status(429));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Retry-After header is present\", () => pm.response.to.have.header(\"Retry-After\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Employees (User A)",
+      "description": "CRUD on /api/v1/emp/employees using {{tokenA}}.",
+      "item": [
+        {
+          "name": "Create employee - valid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"position\": \"Software Developer\",\n  \"salary\": 75000,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Owner is set from the JWT\", () => {",
+                  "pm.expect(pm.response.json().data).to.have.property(\"user\");",
+                  "});",
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"empA_id\", pm.response.json().data._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - missing fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'first_name'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"first_name\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'salary'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"salary\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - invalid email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"not-an-email\",\n  \"position\": \"Software Developer\",\n  \"salary\": 75000,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'email'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - invalid salary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"position\": \"Software Developer\",\n  \"salary\": -500,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'salary'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"salary\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - invalid date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"position\": \"Software Developer\",\n  \"salary\": 75000,\n  \"date_of_joining\": \"2024-02-30\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'date_of_joining'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"date_of_joining\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - no JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"position\": \"Software Developer\",\n  \"salary\": 75000,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create employee - invalid JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer this.is.not-a-valid-token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"position\": \"Software Developer\",\n  \"salary\": 75000,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Engineering\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Message says invalid token\", () => pm.expect(pm.response.json().message).to.eql(\"Invalid token\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Returns an array that contains empA\", () => {",
+                  "const ids = pm.response.json().data.map(e => e._id);",
+                  "pm.expect(ids).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get employee by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Correct employee returned\", () => pm.expect(pm.response.json().data._id).to.eql(pm.collectionVariables.get(\"empA_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"position\": \"Senior Software Developer\",\n  \"salary\": 85000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(true);",
+                  "pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Fields updated\", () => {",
+                  "const d = pm.response.json().data;",
+                  "pm.expect(d.position).to.eql(\"Senior Software Developer\");",
+                  "pm.expect(d.salary).to.eql(85000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update employee - try to change owner",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"000000000000000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'user'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"user\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete employee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees?eid={{empA_delete_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "eid",
+                  "value": "{{empA_delete_id}}"
+                }
+              ]
+            },
+            "description": "The pre-request script creates a throwaway employee, so {{empA_id}} survives for the cross-user tests."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest({",
+                  "  url: pm.variables.get(\"baseUrl\") + \"/api/v1/emp/employees\",",
+                  "  method: \"POST\",",
+                  "  header: { \"Content-Type\": \"application/json\", \"Authorization\": \"Bearer \" + pm.variables.get(\"tokenA\") },",
+                  "  body: { mode: \"raw\", raw: JSON.stringify({\"first_name\":\"Temp\",\"last_name\":\"Smith\",\"email\":\"temp.employee@example.com\",\"position\":\"Software Developer\",\"salary\":75000,\"date_of_joining\":\"2024-01-15\",\"department\":\"Engineering\"}) }",
+                  "}, (err, res) => {",
+                  "  if (!err && res.code === 201) pm.collectionVariables.set(\"empA_delete_id\", res.json().data._id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"No response body\", () => pm.expect(pm.response.text()).to.eql(\"\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get deleted employee",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_delete_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_delete_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get employee - invalid id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/12345",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "12345"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Error mentions field 'eid'\", () => {",
+                  "const fields = (pm.response.json().errors || []).map(e => e.field);",
+                  "pm.expect(fields).to.include(\"eid\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get employee - non-existing id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/000000000000000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "000000000000000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Message is Employee not found\", () => pm.expect(pm.response.json().message).to.eql(\"Employee not found\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cross-user ownership",
+      "description": "User A and User B must never access each other's employees (403).",
+      "item": [
+        {
+          "name": "Setup - User B creates employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Bob\",\n  \"last_name\": \"Brown\",\n  \"email\": \"bob.brown@example.com\",\n  \"position\": \"Designer\",\n  \"salary\": 65000,\n  \"date_of_joining\": \"2024-01-15\",\n  \"department\": \"Design\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"empB_id\", pm.response.json().data._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User B list does not include A's employee",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"A's employee is not visible to B\", () => {",
+                  "const ids = pm.response.json().data.map(e => e._id);",
+                  "pm.expect(ids).to.not.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "pm.expect(ids).to.include(pm.collectionVariables.get(\"empB_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A tries to GET B's employee",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empB_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empB_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A tries to PUT B's employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empB_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empB_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salary\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A tries to DELETE B's employee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees?eid={{empB_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "eid",
+                  "value": "{{empB_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B tries to GET A's employee",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B tries to PUT A's employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empA_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salary\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B tries to DELETE A's employee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees?eid={{empA_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "eid",
+                  "value": "{{empA_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B's employee is unchanged",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emp/employees/{{empB_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emp",
+                "employees",
+                "{{empB_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Salary was not changed by A\", () => pm.expect(pm.response.json().data.salary).to.eql(65000));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "tokenA",
+      "value": ""
+    },
+    {
+      "key": "tokenB",
+      "value": ""
+    },
+    {
+      "key": "empA_id",
+      "value": ""
+    },
+    {
+      "key": "empB_id",
+      "value": ""
+    },
+    {
+      "key": "empA_delete_id",
+      "value": ""
+    },
+    {
+      "key": "userA_username",
+      "value": "alice_comp3123"
+    },
+    {
+      "key": "userA_email",
+      "value": "alice.comp3123@example.com"
+    },
+    {
+      "key": "userA_password",
+      "value": "AlicePass123"
+    },
+    {
+      "key": "userB_username",
+      "value": "bob_comp3123"
+    },
+    {
+      "key": "userB_email",
+      "value": "bob.comp3123@example.com"
+    },
+    {
+      "key": "userB_password",
+      "value": "BobPass1234"
+    },
+    {
+      "key": "newUsername",
+      "value": ""
+    },
+    {
+      "key": "newEmail",
+      "value": ""
+    }
+  ]
+}

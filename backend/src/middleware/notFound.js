@@ -1,0 +1,8 @@
+// Runs only when no route matched the request, so it must be registered after all routes.
+const AppError = require('../utils/AppError');
+
+function notFound(req, res, next) {
+  next(new AppError(`Route not found: ${req.method} ${req.originalUrl}`, 404));
+}
+
+module.exports = notFound;

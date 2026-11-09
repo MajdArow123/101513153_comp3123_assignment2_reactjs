@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment variables (contain secrets). Only the templates are committed.
+.env
+.env.*
+!.env.example
+
+# Backend runtime files: real logs and user uploads stay local.
+# The .gitkeep files keep the empty folders in the repo.
+backend/logs/*
+!backend/logs/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Frontend build output
+frontend/dist/
+
+# Logs and test coverage
+*.log
+coverage/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
