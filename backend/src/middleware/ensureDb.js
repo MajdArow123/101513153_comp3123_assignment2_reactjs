@@ -1,20 +1,16 @@
 // Makes sure MongoDB is connected before an API request reaches a controller.
-// Locally, server.js already connected at startup, so this returns immediately.
-// On Vercel there is no startup step, so the first request in a new instance connects
-// here (and later requests reuse the cached connection from db.js).
-const { connectDB } = require('../config/db');
+// If the database went down after startup, we answer 503 straight away instead of
+// letting the request hang until Mongoose times out.
+const { isDbConnected } = require('../config/db');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 
-async function ensureDb(req, res, next) {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    logger.error('Database connection failed', { error: err.message });
-    // 503 = temporary problem on our side; the client can retry later.
-    next(new AppError('Service temporarily unavailable: database connection failed', 503));
-  }
+function ensureDb(req, res, next) {
+  if (isDbConnected()) return next();
+
+  logger.error('Request rejected: database is not connected', { method: req.method, path: req.originalUrl });
+  // 503 = temporary problem on our side; the client can retry later.
+  next(new AppError('Service temporarily unavailable: database connection failed', 503));
 }
 
 module.exports = ensureDb;

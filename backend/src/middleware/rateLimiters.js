@@ -3,8 +3,8 @@
 // - API limiter (everything under /api): looser, to protect the server from floods.
 // Limits come from env vars so they can be tuned without code changes.
 //
-// Note: counts are kept in memory. On Vercel each serverless instance has its own
-// memory, so there the limit is "per instance", not truly global.
+// Note: counts are kept in memory, so they reset when the server restarts.
+// That is fine for one server; several servers would need a shared store (e.g. Redis).
 const rateLimit = require('express-rate-limit');
 const config = require('../config/env');
 const AppError = require('../utils/AppError');

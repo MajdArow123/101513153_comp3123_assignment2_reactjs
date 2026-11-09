@@ -1,19 +1,12 @@
-// Health check: a quick way (for us, Postman, or a monitoring tool) to see
+// Health check: a quick way (for us, Postman, or the Docker health check) to see
 // that the API is running and whether it can reach the database.
 const express = require('express');
 const config = require('../config/env');
-const { connectDB, getDbState } = require('../config/db');
+const { getDbState } = require('../config/db');
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
-  // On Vercel a fresh instance has not connected yet, so try (or reuse the cached
-  // connection) before reporting. If it fails we still answer, showing the real state.
-  try {
-    await connectDB();
-  } catch {
-    // ignored on purpose: the "database" field below reports the problem
-  }
+router.get('/', (req, res) => {
   const database = getDbState();
 
   res.status(200).json({

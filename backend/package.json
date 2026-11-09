@@ -1,7 +1,7 @@
 {
-  "name": "101513153_comp3123_assignment1",
+  "name": "101513153_comp3123_assignment2_reactjs-backend",
   "version": "1.0.0",
-  "description": "Secure employee management REST API (COMP3123 Assignment 1)",
+  "description": "Secure employee management REST API for the COMP3123 Assignment 2 React app",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,16 +9,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Majd205/101513153_COMP3123_Assignment1.git"
+    "url": "git+https://github.com/MajdArow123/101513153_comp3123_assignment2_reactjs.git"
   },
   "keywords": [],
   "author": "Mjd Arow (101513153)",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Majd205/101513153_COMP3123_Assignment1/issues"
+    "url": "https://github.com/MajdArow123/101513153_comp3123_assignment2_reactjs/issues"
   },
-  "homepage": "https://github.com/Majd205/101513153_COMP3123_Assignment1#readme",
+  "homepage": "https://github.com/MajdArow123/101513153_comp3123_assignment2_reactjs#readme",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

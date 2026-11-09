@@ -1,6 +1,6 @@
 // Central application logger (winston).
-// - Locally: JSON logs go to logs/app.log (everything) and logs/error.log (errors only), plus the console.
-// - On Vercel: console only, because the serverless filesystem is read-only.
+// JSON logs go to logs/app.log (everything) and logs/error.log (errors only), plus the console.
+// In Docker the logs/ folder is mounted from the host, so the files survive container restarts.
 // Sensitive values are redacted before anything is written.
 const fs = require('fs');
 const path = require('path');
@@ -53,7 +53,7 @@ const baseFormat = winston.format.combine(
 
 const transports = [
   new winston.transports.Console({
-    // Human-friendly colours in development; plain JSON elsewhere (Vercel reads JSON well).
+    // Human-friendly colours in development; plain JSON elsewhere (easy for log tools to read).
     format:
       config.nodeEnv === 'development'
         ? winston.format.combine(winston.format.colorize(), winston.format.simple())
@@ -61,24 +61,22 @@ const transports = [
   }),
 ];
 
-if (!config.isVercel) {
-  const logDir = path.join(__dirname, '..', '..', 'logs');
-  fs.mkdirSync(logDir, { recursive: true });
-  transports.push(
-    new winston.transports.File({ filename: path.join(logDir, 'app.log'), format: winston.format.json() }),
-    new winston.transports.File({
-      filename: path.join(logDir, 'error.log'),
-      level: 'error',
-      format: winston.format.json(),
-    })
-  );
-}
+const logDir = path.join(__dirname, '..', '..', 'logs');
+fs.mkdirSync(logDir, { recursive: true });
+transports.push(
+  new winston.transports.File({ filename: path.join(logDir, 'app.log'), format: winston.format.json() }),
+  new winston.transports.File({
+    filename: path.join(logDir, 'error.log'),
+    level: 'error',
+    format: winston.format.json(),
+  })
+);
 
 const logger = winston.createLogger({
   // "http" sits between info and verbose, so request logs are included by default.
   level: process.env.LOG_LEVEL || 'http',
   format: baseFormat,
-  defaultMeta: { service: 'comp3123-assignment1' },
+  defaultMeta: { service: 'comp3123-assignment2-backend' },
   transports,
 });
 

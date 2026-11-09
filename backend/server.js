@@ -1,5 +1,4 @@
-// Local entry point: connect to MongoDB first, then start listening.
-// (On Vercel, api/index.js is used instead because there is no long-running server.)
+// Entry point (locally and in Docker): connect to MongoDB first, then start listening.
 const config = require('./src/config/env'); // validates env vars, throws if any are missing
 const logger = require('./src/utils/logger');
 const { connectDB } = require('./src/config/db');
