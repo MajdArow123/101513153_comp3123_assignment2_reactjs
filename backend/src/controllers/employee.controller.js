@@ -19,7 +19,8 @@ async function search(req, res) {
 }
 
 async function create(req, res) {
-  const employee = await employeeService.createEmployee(req.user.id, req.body);
+  // req.file is set by the upload middleware only when a valid picture was sent.
+  const employee = await employeeService.createEmployee(req.user.id, req.body, req.file);
   sendSuccess(res, 201, 'Employee created successfully', employee);
 }
 
@@ -29,7 +30,7 @@ async function getById(req, res) {
 }
 
 async function update(req, res) {
-  const employee = await employeeService.updateEmployee(req.user.id, req.params.eid, req.body);
+  const employee = await employeeService.updateEmployee(req.user.id, req.params.eid, req.body, req.file);
   sendSuccess(res, 200, 'Employee updated successfully', employee);
 }
 

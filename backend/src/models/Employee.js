@@ -48,6 +48,14 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
       maxlength: [100, 'Department must be at most 100 characters'],
     },
+    // Public URL path of the uploaded picture, e.g. "/uploads/3f2c...e1.webp", or null.
+    // Only the path is stored; the image itself is a file in the uploads folder
+    // (storing raw image bytes in MongoDB would bloat every query).
+    // Set by the server after a validated upload, never directly from the request body.
+    profile_picture: {
+      type: String,
+      default: null,
+    },
     // The owner. Always set from the logged-in user's JWT, never from the request body.
     user: {
       type: mongoose.Schema.Types.ObjectId,

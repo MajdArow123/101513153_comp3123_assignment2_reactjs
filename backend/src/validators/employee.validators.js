@@ -18,6 +18,10 @@ function textField(name, label, max, { optional }) {
 }
 
 // The shared set of field rules. `optional` is true for updates (PUT can change a subset).
+// These work for JSON and for multipart forms: in a form every value arrives as a string,
+// and toFloat()/toDate() convert salary and date_of_joining to the right types.
+// The picture is a file (req.file), not a body field, so checkExact never sees it, and a
+// text field called "profile_picture" is rejected as unknown (clients can't set the path).
 function employeeFields({ optional }) {
   const required = (chain, label) =>
     optional ? chain.optional() : chain.exists({ values: 'null' }).withMessage(`${label} is required`).bail();
@@ -67,8 +71,10 @@ const updateRules = [
   // checkExact only knows about the rules that ran BEFORE it, so it must come
   // before the whole-body check below (which would otherwise mark every field as "known").
   checkExact([], { message: 'Unknown fields are not allowed', locations: ['body'] }),
-  // An empty PUT body would be a no-op; tell the client instead.
-  body().custom((value) => {
+  // An empty PUT would be a no-op; tell the client instead.
+  // A new picture on its own counts as a change, so a picture-only PUT is allowed.
+  body().custom((value, { req }) => {
+    if (req.file) return true;
     if (!value || Object.keys(value).length === 0) throw new Error('Provide at least one field to update');
     return true;
   }),

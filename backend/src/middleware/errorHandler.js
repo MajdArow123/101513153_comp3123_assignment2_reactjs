@@ -3,6 +3,7 @@
 // Express recognises it as an error handler because it has 4 parameters.
 const config = require('../config/env');
 const logger = require('../utils/logger');
+const { deleteUpload } = require('../utils/uploadFiles');
 
 // Translate known error types into a status code + safe client message.
 function normalizeError(err) {
@@ -54,6 +55,13 @@ function normalizeError(err) {
 // eslint-disable-next-line no-unused-vars -- Express needs all 4 args to treat this as an error handler
 function errorHandler(err, req, res, next) {
   const { statusCode, message, errors } = normalizeError(err);
+
+  // If a picture was uploaded but the request failed (bad fields, wrong file content,
+  // 403/404, database error...), delete it so orphan files don't pile up.
+  // This one place covers every failure after Multer saved the file.
+  if (req.file) {
+    deleteUpload(req.file.path); // not awaited: the client's response shouldn't wait for cleanup
+  }
 
   const logMeta = { method: req.method, path: req.originalUrl, statusCode };
   if (statusCode >= 500) {

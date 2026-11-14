@@ -5,6 +5,7 @@ const Employee = require('../models/Employee');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 const escapeRegex = require('../utils/escapeRegex');
+const { toPublicPath, deleteUpload } = require('../utils/uploadFiles');
 
 // Only these fields can be set by a client. Anything else (user, _id, timestamps)
 // is dropped, so the owner can never be set or changed from the request body.
@@ -68,10 +69,16 @@ async function searchEmployees(userId, { department, position }) {
   return employees; // [] when nothing matches -> still a 200
 }
 
-async function createEmployee(userId, data) {
+// `file` is the uploaded picture from Multer (or undefined). If saving fails,
+// the error handler deletes the file, so no orphan images are left behind.
+async function createEmployee(userId, data, file) {
   // The owner is set from the JWT; any "user" in the body was already discarded by pickEditable.
-  const employee = await Employee.create({ ...pickEditable(data), user: userId });
-  logger.info('Employee created', { userId, employeeId: employee.id });
+  const employee = await Employee.create({
+    ...pickEditable(data),
+    profile_picture: file ? toPublicPath(file.filename) : null,
+    user: userId,
+  });
+  logger.info('Employee created', { userId, employeeId: employee.id, withPicture: Boolean(file) });
   return employee;
 }
 
@@ -79,24 +86,40 @@ async function getEmployee(userId, employeeId) {
   return findOwnedEmployee(userId, employeeId, 'read');
 }
 
-async function updateEmployee(userId, employeeId, data) {
-  await findOwnedEmployee(userId, employeeId, 'update');
+async function updateEmployee(userId, employeeId, data, file) {
+  // Ownership is checked BEFORE any picture is attached. If this throws 403/404,
+  // the error handler deletes the newly uploaded file, so nobody can put a picture
+  // on another user's employee.
+  const existing = await findOwnedEmployee(userId, employeeId, 'update');
+
+  const changes = pickEditable(data);
+  if (file) changes.profile_picture = toPublicPath(file.filename);
 
   // The filter includes the owner too, so even the write itself can only
   // ever touch this user's document (defence in depth).
   const updated = await Employee.findOneAndUpdate(
     { _id: employeeId, user: userId },
-    pickEditable(data),
+    changes,
     { returnDocument: 'after', runValidators: true } // return the new version, and enforce schema rules on updates
   );
 
-  logger.info('Employee updated', { userId, employeeId });
+  // Only after the database points at the new picture do we delete the old file.
+  // (If the update had failed, the old picture would still be in use.)
+  if (file && existing.profile_picture) {
+    await deleteUpload(existing.profile_picture);
+  }
+
+  logger.info('Employee updated', { userId, employeeId, pictureReplaced: Boolean(file) });
   return updated;
 }
 
 async function deleteEmployee(userId, employeeId) {
-  await findOwnedEmployee(userId, employeeId, 'delete');
+  const employee = await findOwnedEmployee(userId, employeeId, 'delete');
   await Employee.deleteOne({ _id: employeeId, user: userId });
+
+  // Remove the stored picture too, so deleted employees don't leave files behind.
+  await deleteUpload(employee.profile_picture);
+
   logger.info('Employee deleted', { userId, employeeId });
 }
 
