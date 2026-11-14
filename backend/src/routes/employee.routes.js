@@ -11,6 +11,9 @@ const router = express.Router();
 router.use(auth);
 
 router.get('/employees', employeeController.list);
+// Must be registered BEFORE '/employees/:eid', otherwise Express would treat
+// the word "search" as an employee id.
+router.get('/employees/search', rules.searchRules, validate, employeeController.search);
 router.post('/employees', rules.createRules, validate, employeeController.create);
 router.get('/employees/:eid', rules.getByIdRules, validate, employeeController.getById);
 router.put('/employees/:eid', rules.updateRules, validate, employeeController.update);

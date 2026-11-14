@@ -83,4 +83,35 @@ const deleteRules = [
     .isMongoId().withMessage('Invalid employee id'),
 ];
 
-module.exports = { createRules, updateRules, getByIdRules, deleteRules };
+// One optional search term from the query string: must be a single string, trimmed, max 100 chars.
+// (?department=a&department=b would arrive as an array, and isString rejects it.)
+function searchTerm(name, label) {
+  return query(name)
+    .optional()
+    .isString().withMessage(`${label} must be a single text value`).bail()
+    .trim()
+    .isLength({ max: 100 }).withMessage(`${label} must be at most 100 characters`);
+}
+
+// Not sent, or only spaces. (Wrong types such as arrays are NOT "missing";
+// searchTerm() reports those with a clearer message.)
+const isMissing = (value) => value === undefined || (typeof value === 'string' && value.trim() === '');
+
+const searchRules = [
+  // A search with no terms would just be the full list, so require at least one.
+  // This check runs FIRST on purpose: each rule stores the value it saw, and the last
+  // rule for a field wins in matchedData(). Running the trim rules below last means
+  // the controller gets the trimmed values.
+  query('department').custom((department, { req }) => {
+    if (isMissing(department) && isMissing(req.query.position)) {
+      throw new Error('Provide at least one search term: department or position');
+    }
+    return true;
+  }),
+  searchTerm('department', 'Department'),
+  searchTerm('position', 'Position'),
+  // Reject anything else in the query string (e.g. ?salary=1 or ?department[$ne]=x).
+  checkExact([], { message: 'Unknown query parameters are not allowed', locations: ['query'] }),
+];
+
+module.exports = { createRules, updateRules, getByIdRules, deleteRules, searchRules };

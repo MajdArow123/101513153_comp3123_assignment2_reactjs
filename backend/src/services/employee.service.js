@@ -4,6 +4,7 @@
 const Employee = require('../models/Employee');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
+const escapeRegex = require('../utils/escapeRegex');
 
 // Only these fields can be set by a client. Anything else (user, _id, timestamps)
 // is dropped, so the owner can never be set or changed from the request body.
@@ -45,6 +46,28 @@ async function listEmployees(userId) {
   return Employee.find({ user: userId }).sort({ created_at: -1 });
 }
 
+// Case-insensitive partial match on department and/or position.
+// The filter ALWAYS starts with the owner, so a search can never return
+// another user's employees, whatever the search terms are.
+async function searchEmployees(userId, { department, position }) {
+  const filter = { user: userId };
+
+  // The text is escaped first, so it is matched literally (no regex tricks).
+  if (department) filter.department = { $regex: escapeRegex(department), $options: 'i' };
+  if (position) filter.position = { $regex: escapeRegex(position), $options: 'i' };
+
+  const employees = await Employee.find(filter).sort({ created_at: -1 }); // same order as the list
+
+  // Log which fields were searched and how many matched, but not the search text itself.
+  logger.info('Employee search', {
+    userId,
+    fields: Object.keys(filter).filter((key) => key !== 'user'),
+    resultCount: employees.length,
+  });
+
+  return employees; // [] when nothing matches -> still a 200
+}
+
 async function createEmployee(userId, data) {
   // The owner is set from the JWT; any "user" in the body was already discarded by pickEditable.
   const employee = await Employee.create({ ...pickEditable(data), user: userId });
@@ -77,4 +100,4 @@ async function deleteEmployee(userId, employeeId) {
   logger.info('Employee deleted', { userId, employeeId });
 }
 
-module.exports = { listEmployees, createEmployee, getEmployee, updateEmployee, deleteEmployee };
+module.exports = { listEmployees, searchEmployees, createEmployee, getEmployee, updateEmployee, deleteEmployee };

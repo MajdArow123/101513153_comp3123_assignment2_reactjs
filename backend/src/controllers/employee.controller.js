@@ -1,11 +1,21 @@
 // Employee controllers. The user id ALWAYS comes from req.user (set by the auth
 // middleware from the JWT), never from the body, params, or query string.
+const { matchedData } = require('express-validator');
 const employeeService = require('../services/employee.service');
 const { sendSuccess } = require('../utils/response');
 
 async function list(req, res) {
   const employees = await employeeService.listEmployees(req.user.id);
   sendSuccess(res, 200, 'Employees retrieved successfully', employees);
+}
+
+async function search(req, res) {
+  // In Express 5, req.query is re-read from the URL every time, so the trimmed values
+  // from the validators are not stored there. matchedData() returns those validated,
+  // trimmed values (and only the fields that have rules).
+  const { department, position } = matchedData(req, { locations: ['query'] });
+  const employees = await employeeService.searchEmployees(req.user.id, { department, position });
+  sendSuccess(res, 200, 'Search completed successfully', employees);
 }
 
 async function create(req, res) {
@@ -29,4 +39,4 @@ async function remove(req, res) {
   res.status(204).end();
 }
 
-module.exports = { list, create, getById, update, remove };
+module.exports = { list, search, create, getById, update, remove };
