@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "COMP3123 Assignment 1",
-    "description": "Employee management REST API (Node.js, Express, MongoDB).\n\nRun the folders in order: Health -> Signup -> Login -> Employees (User A) -> Cross-user ownership.\nSet {{baseUrl}} to http://localhost:3000 (local) or your Vercel URL.\n\nRate limits: signup and login allow AUTH_RATE_LIMIT_MAX requests per window per IP (default 5).\nThe Signup folder alone sends 8 requests, so for a full collection run set AUTH_RATE_LIMIT_MAX=10 in .env and restart the server.\nThe limit is kept in memory: restart the server before running the collection again.",
+    "name": "COMP3123 Assignment 2",
+    "description": "Employee management REST API (Node.js, Express, MongoDB) used by the React frontend.\n\nRun the folders in order: Health -> Signup -> Login -> Employees (User A) -> Cross-user ownership -> Search -> Profile pictures -> CORS -> Rate limiting (run last).\n{{baseUrl}} is http://localhost:5000 (both for \"npm run dev\" and for Docker Compose).\n\nPicture uploads use the files in postman/fixtures. Newman finds them with --working-dir postman.\nIn the Postman app, if a file shows as missing, re-select it in the request's Body -> form-data tab\n(or set Settings -> General -> Working directory to the postman folder).\n\nRate limits: signup and login allow AUTH_RATE_LIMIT_MAX requests per 15 minutes per IP (default 5),\nand all /api routes allow API_RATE_LIMIT_MAX (default 100). A full run sends more than that, so start\nthe backend with higher limits for testing, e.g. AUTH_RATE_LIMIT_MAX=20 API_RATE_LIMIT_MAX=300.\nThe counters are kept in memory: restart the backend before running the collection again.\nThe 429 test is in the last folder, so it never blocks the other requests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -35,7 +35,8 @@
                   "const b = pm.response.json();",
                   "pm.expect(b).to.include.keys(\"status\", \"uptime\", \"timestamp\", \"environment\", \"database\");",
                   "pm.expect(b.database).to.eql(\"connected\");",
-                  "});"
+                  "});",
+                  "pm.test(\"Helmet allows cross-origin images (CORP)\", () => pm.response.to.have.header(\"Cross-Origin-Resource-Policy\", \"cross-origin\"));"
                 ]
               }
             }
@@ -534,7 +535,8 @@
                   "pm.test(\"Returns a JWT\", () => pm.expect(pm.response.json().data.token).to.be.a(\"string\").and.not.empty);",
                   "if (pm.response.code === 200) {",
                   "pm.collectionVariables.set(\"tokenA\", pm.response.json().data.token);",
-                  "}"
+                  "}",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"userA_id\", pm.response.json().data.user._id);"
                 ]
               }
             }
@@ -587,7 +589,8 @@
                   "pm.test(\"Returns a JWT\", () => pm.expect(pm.response.json().data.token).to.be.a(\"string\").and.not.empty);",
                   "if (pm.response.code === 200) {",
                   "pm.collectionVariables.set(\"tokenB\", pm.response.json().data.token);",
-                  "}"
+                  "}",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"userB_id\", pm.response.json().data.user._id);"
                 ]
               }
             }
@@ -697,78 +700,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "Login - rate limit (429)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/user/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "user",
-                "login"
-              ]
-            },
-            "description": "Run this LAST in the Login folder: it uses up the login limit for 15 minutes (restart the server to reset). The pre-request script sends failed logins until the limit is reached, then this request must get 429.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"username\": \"rate_limit_demo\",\n  \"password\": \"WrongPassword1\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Keep sending failed logins until the server answers 429 (max 30 tries).",
-                  "const send = (n) => {",
-                  "  if (n > 30) return;",
-                  "  pm.sendRequest({",
-                  "    url: pm.variables.get(\"baseUrl\") + \"/api/v1/user/login\",",
-                  "    method: \"POST\",",
-                  "    header: { \"Content-Type\": \"application/json\" },",
-                  "    body: { mode: \"raw\", raw: JSON.stringify({ username: \"rate_limit_demo\", password: \"WrongPassword1\" }) }",
-                  "  }, (err, res) => {",
-                  "    if (!err && res.code !== 429) send(n + 1);",
-                  "  });",
-                  "};",
-                  "send(1);"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 429\", () => pm.response.to.have.status(429));",
-                  "pm.test(\"Standard error shape\", () => {",
-                  "const b = pm.response.json();",
-                  "pm.expect(b.status).to.eql(false);",
-                  "pm.expect(b.message).to.be.a(\"string\");",
-                  "});",
-                  "pm.test(\"Retry-After header is present\", () => pm.response.to.have.header(\"Retry-After\"));"
-                ]
-              }
-            }
-          ]
         }
       ]
     },
@@ -827,7 +758,8 @@
                   "pm.test(\"Owner is set from the JWT\", () => {",
                   "pm.expect(pm.response.json().data).to.have.property(\"user\");",
                   "});",
-                  "if (pm.response.code === 201) pm.collectionVariables.set(\"empA_id\", pm.response.json().data._id);"
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"empA_id\", pm.response.json().data._id);",
+                  "pm.test(\"No picture -> profile_picture is null\", () => pm.expect(pm.response.json().data.profile_picture).to.eql(null));"
                 ]
               }
             }
@@ -1206,6 +1138,9 @@
                   "pm.test(\"Returns an array that contains empA\", () => {",
                   "const ids = pm.response.json().data.map(e => e._id);",
                   "pm.expect(ids).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});",
+                  "pm.test(\"Every employee has a profile_picture field\", () => {",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e).to.have.property(\"profile_picture\"));",
                   "});"
                 ]
               }
@@ -1973,12 +1908,1218 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Search",
+      "description": "GET /api/v1/emp/employees/search: owner-scoped, case-insensitive partial match. Assertions are relative (only the user's own employees, and the expected employee is included), so they also pass on a database that has data from earlier runs.",
+      "item": [
+        {
+          "name": "Search - by department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=engineer"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(true);",
+                  "    pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Partial match finds A's employee\", () => {",
+                  "    const ids = pm.response.json().data.map((e) => e._id);",
+                  "    pm.expect(ids).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});",
+                  "pm.test(\"Every result's department matches\", () => {",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.department).to.match(/engineer/i));",
+                  "});",
+                  "pm.test(\"Every result belongs to the logged-in user\", () => {",
+                  "    const owner = pm.collectionVariables.get(\"userA_id\");",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.user).to.eql(owner));",
+                  "});",
+                  "pm.test(\"Results include profile_picture\", () => {",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e).to.have.property(\"profile_picture\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - by position",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?position=developer"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Finds A's employee by position\", () => {",
+                  "    pm.expect(pm.response.json().data.map((e) => e._id)).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});",
+                  "pm.test(\"Every result's position matches\", () => {",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.position).to.match(/developer/i));",
+                  "});",
+                  "pm.test(\"Every result belongs to the logged-in user\", () => {",
+                  "    const owner = pm.collectionVariables.get(\"userA_id\");",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.user).to.eql(owner));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - department and position",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=Engineering&position=Senior"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Both filters apply\", () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.map((e) => e._id)).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "    data.forEach((e) => {",
+                  "        pm.expect(e.department).to.match(/engineering/i);",
+                  "        pm.expect(e.position).to.match(/senior/i);",
+                  "    });",
+                  "});",
+                  "pm.test(\"Every result belongs to the logged-in user\", () => {",
+                  "    const owner = pm.collectionVariables.get(\"userA_id\");",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.user).to.eql(owner));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - case-insensitive",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=ENGINEERING"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Upper-case search still finds the employee\", () => {",
+                  "    pm.expect(pm.response.json().data.map((e) => e._id)).to.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - no match returns []",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=no-such-department-{{$timestamp}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(true);",
+                  "    pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Empty array\", () => pm.expect(pm.response.json().data).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - regex characters are literal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=.*"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test('\".*\" is matched as text, not as \"match everything\"', () => pm.expect(pm.response.json().data).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - no parameters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Explains that a search term is required\", () => {",
+                  "    pm.expect(pm.response.json().errors[0].message).to.include(\"at least one search term\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - unknown parameter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=eng&salary=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Names the unknown field\", () => {",
+                  "    pm.expect(pm.response.json().errors.map((e) => e.field)).to.include(\"salary\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - no JWT",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=eng"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search - User B can't see A's employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/search?department=engineer"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"A's employee is not in B's results\", () => {",
+                  "    pm.expect(pm.response.json().data.map((e) => e._id)).to.not.include(pm.collectionVariables.get(\"empA_id\"));",
+                  "});",
+                  "pm.test(\"Every result belongs to the logged-in user\", () => {",
+                  "    const owner = pm.collectionVariables.get(\"userB_id\");",
+                  "    pm.response.json().data.forEach((e) => pm.expect(e.user).to.eql(owner));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profile pictures",
+      "description": "multipart/form-data uploads in the field \"profile_picture\". JPEG, PNG or WebP only, max 2 MB, checked by type and by file content (magic bytes). Files are in postman/fixtures.",
+      "item": [
+        {
+          "name": "Create employee with picture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Paula",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Picture",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "paula.picture@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Product Designer",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Design",
+                  "type": "text"
+                },
+                {
+                  "key": "salary",
+                  "value": "68000",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_joining",
+                  "value": "2024-02-01",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Standard success shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(true);",
+                  "    pm.expect(b).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"Returns a safe generated picture path\", () => {",
+                  "    pm.expect(pm.response.json().data.profile_picture).to.match(/^\\/uploads\\/[0-9a-f-]{36}\\.png$/);",
+                  "});",
+                  "pm.test(\"Form strings are converted (salary is a number)\", () => pm.expect(pm.response.json().data.salary).to.eql(68000));",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set(\"empPic_id\", pm.response.json().data._id);",
+                  "    pm.collectionVariables.set(\"empPic_picture\", pm.response.json().data.profile_picture);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Picture URL serves the image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}{{empPic_picture}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Content-Type is image/png\", () => pm.response.to.have.header(\"Content-Type\", \"image/png\"));",
+                  "pm.test(\"Can be shown by the React app on another origin\", () => {",
+                  "    pm.response.to.have.header(\"Cross-Origin-Resource-Policy\", \"cross-origin\");",
+                  "});",
+                  "pm.test(\"nosniff is set\", () => pm.response.to.have.header(\"X-Content-Type-Options\", \"nosniff\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get employee returns the picture",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/{{empPic_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"profile_picture is returned\", () => {",
+                  "    pm.expect(pm.response.json().data.profile_picture).to.eql(pm.collectionVariables.get(\"empPic_picture\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List returns the picture",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"The new employee is listed with its picture\", () => {",
+                  "    const e = pm.response.json().data.find((x) => x._id === pm.collectionVariables.get(\"empPic_id\"));",
+                  "    pm.expect(e.profile_picture).to.eql(pm.collectionVariables.get(\"empPic_picture\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload - wrong file type (text renamed .png)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Fiona",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Picture",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "fiona.picture@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Product Designer",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Design",
+                  "type": "text"
+                },
+                {
+                  "key": "salary",
+                  "value": "68000",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_joining",
+                  "value": "2024-02-01",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/fake.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Friendly type message\", () => {",
+                  "    pm.expect(pm.response.json().message).to.eql(\"Profile picture must be a JPEG, PNG or WebP image\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload - file too large (> 2 MB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Tara",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Picture",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "tara.picture@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Product Designer",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Design",
+                  "type": "text"
+                },
+                {
+                  "key": "salary",
+                  "value": "68000",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_joining",
+                  "value": "2024-02-01",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/too-big.jpg"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Friendly size message\", () => pm.expect(pm.response.json().message).to.eql(\"Profile picture must be 2 MB or smaller\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload - two files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Theo",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Picture",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "theo.picture@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Product Designer",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Design",
+                  "type": "text"
+                },
+                {
+                  "key": "salary",
+                  "value": "68000",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_joining",
+                  "value": "2024-02-01",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid.png"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid-replacement.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Only one file allowed\", () => pm.expect(pm.response.json().message).to.include(\"Only one file\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload - valid picture but invalid fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Ivan",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Picture",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "ivan.picture@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Product Designer",
+                  "type": "text"
+                },
+                {
+                  "key": "department",
+                  "value": "Design",
+                  "type": "text"
+                },
+                {
+                  "key": "salary",
+                  "value": "-5",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_joining",
+                  "value": "2024-02-01",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Field error for salary (the uploaded file is deleted by the server)\", () => {",
+                  "    pm.expect(pm.response.json().errors[0].field).to.eql(\"salary\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update - replace the picture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/{{empPic_id}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid-replacement.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Remember the old path so the next request can check the old file is gone.",
+                  "pm.collectionVariables.set(\"empPic_old_picture\", pm.collectionVariables.get(\"empPic_picture\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"A new picture path is returned\", () => {",
+                  "    const pic = pm.response.json().data.profile_picture;",
+                  "    pm.expect(pic).to.match(/^\\/uploads\\/[0-9a-f-]{36}\\.png$/);",
+                  "    pm.expect(pic).to.not.eql(pm.collectionVariables.get(\"empPic_old_picture\"));",
+                  "});",
+                  "pm.test(\"Other fields are unchanged\", () => pm.expect(pm.response.json().data.first_name).to.eql(\"Paula\"));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"empPic_picture\", pm.response.json().data.profile_picture);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old picture file was deleted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}{{empPic_old_picture}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User B tries to replace A's picture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/{{empPic_id}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A's picture is unchanged",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/{{empPic_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Still the picture A uploaded\", () => {",
+                  "    pm.expect(pm.response.json().data.profile_picture).to.eql(pm.collectionVariables.get(\"empPic_picture\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload on a non-existing employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees/000000000000000000000000",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": "fixtures/valid.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.eql(false);",
+                  "    pm.expect(b.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete employee with picture",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees?eid={{empPic_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted employee's picture is gone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}{{empPic_picture}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CORS",
+      "description": "Only the frontend origin (CORS_ORIGIN) gets CORS headers. Browsers send a preflight OPTIONS request before calls with an Authorization header.",
+      "item": [
+        {
+          "name": "Preflight from the frontend origin",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "authorization,content-type"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"Origin is allowed\", () => pm.response.to.have.header(\"Access-Control-Allow-Origin\", pm.collectionVariables.get(\"frontendOrigin\")));",
+                  "pm.test(\"Authorization header is allowed\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Access-Control-Allow-Headers\")).to.include(\"Authorization\");",
+                  "});",
+                  "pm.test(\"Needed methods are allowed\", () => {",
+                  "    const m = pm.response.headers.get(\"Access-Control-Allow-Methods\");",
+                  "    [\"GET\", \"POST\", \"PUT\", \"DELETE\"].forEach((x) => pm.expect(m).to.include(x));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preflight from another origin",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://evil.example.com"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"No Access-Control-Allow-Origin header (browser blocks it)\", () => {",
+                  "    pm.response.to.not.have.header(\"Access-Control-Allow-Origin\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate-limit headers are readable by the frontend",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Origin",
+                "value": "{{frontendOrigin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/emp/employees"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Retry-After and RateLimit are exposed\", () => {",
+                  "    const exposed = pm.response.headers.get(\"Access-Control-Expose-Headers\");",
+                  "    pm.expect(exposed).to.include(\"Retry-After\");",
+                  "    pm.expect(exposed).to.include(\"RateLimit\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rate limiting (run last)",
+      "description": "Sends failed logins until the login limiter answers 429. Restart the backend afterwards to reset the counters.",
+      "item": [
+        {
+          "name": "Login - rate limit (429)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "login"
+              ]
+            },
+            "description": "Run this LAST in the Login folder: it uses up the login limit for 15 minutes (restart the server to reset). The pre-request script sends failed logins until the limit is reached, then this request must get 429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"rate_limit_demo\",\n  \"password\": \"WrongPassword1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Keep sending failed logins until the server answers 429 (max 30 tries).",
+                  "const send = (n) => {",
+                  "  if (n > 30) return;",
+                  "  pm.sendRequest({",
+                  "    url: pm.variables.get(\"baseUrl\") + \"/api/v1/user/login\",",
+                  "    method: \"POST\",",
+                  "    header: { \"Content-Type\": \"application/json\" },",
+                  "    body: { mode: \"raw\", raw: JSON.stringify({ username: \"rate_limit_demo\", password: \"WrongPassword1\" }) }",
+                  "  }, (err, res) => {",
+                  "    if (!err && res.code !== 429) send(n + 1);",
+                  "  });",
+                  "};",
+                  "send(1);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 429\", () => pm.response.to.have.status(429));",
+                  "pm.test(\"Standard error shape\", () => {",
+                  "const b = pm.response.json();",
+                  "pm.expect(b.status).to.eql(false);",
+                  "pm.expect(b.message).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Retry-After header is present\", () => pm.response.to.have.header(\"Retry-After\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3000"
+      "value": "http://localhost:5000"
     },
     {
       "key": "tokenA",
@@ -2030,6 +3171,30 @@
     },
     {
       "key": "newEmail",
+      "value": ""
+    },
+    {
+      "key": "frontendOrigin",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "userA_id",
+      "value": ""
+    },
+    {
+      "key": "userB_id",
+      "value": ""
+    },
+    {
+      "key": "empPic_id",
+      "value": ""
+    },
+    {
+      "key": "empPic_picture",
+      "value": ""
+    },
+    {
+      "key": "empPic_old_picture",
       "value": ""
     }
   ]
