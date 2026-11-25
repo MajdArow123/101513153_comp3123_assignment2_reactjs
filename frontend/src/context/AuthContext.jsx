@@ -23,6 +23,10 @@ function loadInitialSession() {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(loadInitialSession);
+  // Why the user was logged out (e.g. "session expired"), shown on the login page.
+  // Kept here rather than in the router's state, because ProtectedRoute also redirects
+  // to /login when the session is cleared, and its redirect would replace that state.
+  const [logoutMessage, setLogoutMessage] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -30,18 +34,19 @@ export function AuthProvider({ children }) {
   const login = useCallback((token, user) => {
     saveSession(token, user);
     setSession({ token, user });
+    setLogoutMessage('');
   }, []);
 
-  // Clears everything about the current user. `message` is shown on the login page
-  // (e.g. "session expired"). replace: true removes the protected page from history,
-  // so the Back button can't return to it.
+  // Clears everything about the current user. replace: true removes the protected page
+  // from history, so the Back button can't return to it.
   const logout = useCallback(
-    (message) => {
+    (message = '') => {
       clearSession();
       setSession({ token: null, user: null });
+      setLogoutMessage(message);
       // Remove cached API data, so the next user never sees the previous user's employees.
       queryClient.clear();
-      navigate('/login', { replace: true, state: message ? { message } : undefined });
+      navigate('/login', { replace: true });
     },
     [navigate, queryClient]
   );
@@ -59,8 +64,8 @@ export function AuthProvider({ children }) {
 
   // useMemo: only give consumers a new object when something actually changed.
   const value = useMemo(
-    () => ({ token: session.token, user: session.user, isAuthenticated, login, logout }),
-    [session, isAuthenticated, login, logout]
+    () => ({ token: session.token, user: session.user, isAuthenticated, logoutMessage, login, logout }),
+    [session, isAuthenticated, logoutMessage, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

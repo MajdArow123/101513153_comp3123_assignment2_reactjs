@@ -20,16 +20,14 @@ const VALIDATORS = {
 
 function LoginPage() {
   const location = useLocation();
-  const { login } = useAuth();
+  // logoutMessage: why we were sent here, e.g. "Your session has expired" (set by AuthContext).
+  const { login, logoutMessage } = useAuth();
   const notify = useNotify();
 
   // Pre-filled after signup (the signup page passes the new username).
   const [values, setValues] = useState({ identifier: location.state?.username || '', password: '' });
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
-
-  // Message passed when we were redirected here, e.g. "Your session has expired".
-  const redirectMessage = location.state?.message;
 
   const mutation = useMutation({ mutationFn: loginRequest });
 
@@ -89,9 +87,9 @@ function LoginPage() {
 
   return (
     <AuthLayout title="Log in" subtitle="Manage your employees">
-      {redirectMessage && !formError && (
+      {logoutMessage && !formError && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {redirectMessage}
+          {logoutMessage}
         </Alert>
       )}
       {/* role="alert" (built into Alert) makes screen readers announce the error. */}

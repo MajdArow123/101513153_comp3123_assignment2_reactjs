@@ -54,6 +54,13 @@ function getRateLimitMessage(headers, data) {
   return data?.message || 'Too many requests. Please wait a moment and try again.';
 }
 
+// True when an employee can't be opened: 404 (doesn't exist), 403 (another user's) or
+// 400 (the id in the URL isn't a valid id). The UI shows the same "not found" screen for
+// all three, so it never reveals whether another user's employee exists.
+export function isNotAccessibleError(error) {
+  return [400, 403, 404].includes(error?.response?.status);
+}
+
 // Field-level messages from the backend's errors[] array, as { fieldName: message }.
 // Only the first message per field is kept.
 export function getFieldErrors(error) {
