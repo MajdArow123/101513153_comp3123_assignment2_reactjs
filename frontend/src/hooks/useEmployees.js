@@ -2,13 +2,30 @@
 // the hooks give loading/error states and caching, and the query keys below decide
 // which cached data is refreshed after a change.
 //   ['employees']                    -> the full list
-//   ['employees', 'search', params]  -> search results (Phase 9)
+//   ['employees', 'search', params]  -> search results
 //   ['employee', id]                 -> one employee
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createEmployee, deleteEmployee, getEmployee, listEmployees, updateEmployee } from '../api/employees.api';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  createEmployee, deleteEmployee, getEmployee, listEmployees, searchEmployees, updateEmployee,
+} from '../api/employees.api';
 
-export function useEmployeesQuery() {
-  return useQuery({ queryKey: ['employees'], queryFn: listEmployees });
+// `enabled: false` while searching, so the full list isn't requested for nothing.
+export function useEmployeesQuery({ enabled = true } = {}) {
+  return useQuery({ queryKey: ['employees'], queryFn: listEmployees, enabled });
+}
+
+// params = { department, position } (already trimmed). The search runs on the backend,
+// which only returns the logged-in user's employees.
+export function useSearchEmployeesQuery(params) {
+  const hasTerm = Boolean(params.department || params.position);
+  return useQuery({
+    queryKey: ['employees', 'search', params],
+    queryFn: () => searchEmployees(params),
+    enabled: hasTerm,
+    // While the next search loads, keep showing the previous results instead of
+    // flashing skeletons on every change.
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useEmployeeQuery(id) {
