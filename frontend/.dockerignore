@@ -1,0 +1,10 @@
+# Files that must not be copied into the frontend build.
+node_modules
+dist
+npm-debug.log
+# The API URL comes from the VITE_API_URL build argument in docker-compose.yml.
+.env
+.env.*
+!.env.example
+Dockerfile
+.dockerignore

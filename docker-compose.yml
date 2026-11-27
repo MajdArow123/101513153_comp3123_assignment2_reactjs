@@ -1,0 +1,94 @@
+# Runs the whole app with one command:  docker compose up --build
+#
+#   browser ──> frontend (nginx, http://localhost:3000)   static React files
+#   browser ──> backend  (Express, http://localhost:5000)  the REST API
+#               backend ──> mongo (mongodb://mongo:27017)  only reachable inside Docker
+#   browser ──> mongo-express (http://localhost:8081)      database viewer, password protected
+#
+# Inside Docker, containers reach each other by SERVICE NAME (the backend connects to
+# "mongo", not "localhost"). Your browser runs on your computer, outside Docker, so it
+# uses localhost and the published ports instead.
+#
+# Before the first run:
+#   cp .env.example .env                  (mongo-express login, used by this file)
+#   cp backend/.env.example backend/.env  (and set a real JWT_SECRET)
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # No "ports:" on purpose. Only the backend and mongo-express need the database, and
+    # they reach it over Compose's internal network. Not publishing 27017 means nothing
+    # on your computer or your network can connect to it directly.
+    volumes:
+      - mongo-data:/data/db # the data survives `docker compose down` and rebuilds
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mongo-express:
+    image: mongo-express:1
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
+      # The login for the web UI comes from the root .env file (not committed).
+      # Compose stops with this message if a value is missing.
+      ME_CONFIG_BASICAUTH: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_USERNAME:?Set ME_USERNAME in .env (see .env.example)}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASSWORD:?Set ME_PASSWORD in .env (see .env.example)}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # Secrets (JWT_SECRET) and the other settings come from backend/.env (not committed).
+    env_file: ./backend/.env
+    # These values replace the ones in backend/.env, because in Docker they are different:
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/comp3123_assignment2 # service name, not localhost
+      DB_NAME: comp3123_assignment2
+      PORT: 5000
+      CORS_ORIGIN: http://localhost:3000 # the frontend's address as the browser sees it
+      NODE_ENV: production
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads-data:/app/uploads # profile pictures survive container rebuilds
+      - ./backend/logs:/app/logs # log files show up in backend/logs on your computer
+    healthcheck:
+      # "status":"ok" means the API is running AND connected to MongoDB.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health | grep -q '\"status\":\"ok\"' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The React code runs in the BROWSER on your computer, not inside Docker, and the
+        # browser can't resolve Compose service names like "backend". So the API address
+        # is localhost:5000 (the backend's published port), NOT http://backend:5000.
+        # Only container-to-container traffic (backend -> mongo) uses service names.
+        VITE_API_URL: http://localhost:5000
+    restart: unless-stopped
+    ports:
+      - "3000:80" # nginx listens on 80 inside the container
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+  uploads-data:

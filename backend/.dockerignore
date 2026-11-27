@@ -1,0 +1,13 @@
+# Files that must not be copied into the backend image.
+node_modules
+npm-debug.log
+# Secrets: the container gets its settings from docker-compose.yml / env_file instead.
+.env
+.env.*
+!.env.example
+# Runtime data: logs and uploaded pictures are mounted as volumes, not baked into the image.
+logs
+uploads
+Dockerfile
+.dockerignore
+README.md
