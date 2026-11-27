@@ -1,7 +1,7 @@
 // Shows a list of employees: a table on wide screens, stacked cards on narrow ones
 // (a 7-column table doesn't fit on a phone). Used for the full list and for search results.
 // With `loading` it shows skeleton placeholders in the same layout.
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box, Card, CardActions, CardContent, IconButton, Paper, Skeleton, Stack, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, useMediaQuery,
@@ -20,15 +20,19 @@ const SKELETON_ROWS = 4;
 // says "Delete Jane Doe" instead of just "Delete".
 function RowActions({ employee, onDelete, disabled }) {
   const name = fullName(employee);
+  // Pass the list's current search (e.g. "?department=eng") along, so the details
+  // page's "Back to employees" button can return to the same results.
+  const { search } = useLocation();
+  const linkState = { listSearch: search };
   return (
     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
       <Tooltip title="View">
-        <IconButton component={RouterLink} to={`/employees/${employee._id}`} aria-label={`View ${name}`}>
+        <IconButton component={RouterLink} to={`/employees/${employee._id}`} state={linkState} aria-label={`View ${name}`}>
           <VisibilityIcon />
         </IconButton>
       </Tooltip>
       <Tooltip title="Edit">
-        <IconButton component={RouterLink} to={`/employees/${employee._id}/edit`} aria-label={`Edit ${name}`} color="primary">
+        <IconButton component={RouterLink} to={`/employees/${employee._id}/edit`} state={linkState} aria-label={`Edit ${name}`} color="primary">
           <EditIcon />
         </IconButton>
       </Tooltip>

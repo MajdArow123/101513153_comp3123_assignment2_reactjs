@@ -10,6 +10,7 @@ import PasswordField from '../components/PasswordField';
 import { login as loginRequest } from '../api/auth.api';
 import { useAuth } from '../context/AuthContext';
 import { useNotify } from '../context/NotificationContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { getErrorMessage, getFieldErrors } from '../utils/errors';
 import { validateLoginIdentifier, validateLoginPassword } from '../utils/validation';
 
@@ -23,6 +24,7 @@ function LoginPage() {
   // logoutMessage: why we were sent here, e.g. "Your session has expired" (set by AuthContext).
   const { login, logoutMessage } = useAuth();
   const notify = useNotify();
+  usePageTitle('Log in');
 
   // Pre-filled after signup (the signup page passes the new username).
   const [values, setValues] = useState({ identifier: location.state?.username || '', password: '' });

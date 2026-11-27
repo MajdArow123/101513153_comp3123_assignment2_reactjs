@@ -6,12 +6,16 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function PublicOnlyRoute() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, previousUsername } = useAuth();
   const location = useLocation();
 
   if (isAuthenticated) {
     const from = location.state?.from;
-    const target = from?.pathname ? `${from.pathname}${from.search || ''}` : '/employees';
+    // Only return to `from` if it was this same user's page. After a session expires
+    // and a DIFFERENT user logs in, the old page (another user's employee) would just
+    // show "not found", so they start on the list instead.
+    const sameUser = !previousUsername || previousUsername === user?.username;
+    const target = from?.pathname && sameUser ? `${from.pathname}${from.search || ''}` : '/employees';
     return <Navigate to={target} replace />;
   }
 

@@ -4,6 +4,7 @@ import { Typography } from '@mui/material';
 
 import EmployeeForm from '../components/EmployeeForm';
 import { useCreateEmployee } from '../hooks/useEmployees';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNotify } from '../context/NotificationContext';
 import { fullName } from '../utils/format';
 
@@ -12,6 +13,7 @@ function AddEmployeePage() {
   const location = useLocation();
   const notify = useNotify();
   const createMutation = useCreateEmployee();
+  usePageTitle('Add employee');
 
   const handleSubmit = async (formData) => {
     // mutateAsync throws on failure, so EmployeeForm can show the backend's errors.

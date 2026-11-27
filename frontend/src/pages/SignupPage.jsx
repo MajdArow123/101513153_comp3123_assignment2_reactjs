@@ -9,6 +9,7 @@ import AuthLayout from '../components/AuthLayout';
 import PasswordField from '../components/PasswordField';
 import { signup } from '../api/auth.api';
 import { useNotify } from '../context/NotificationContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { getErrorMessage, getFieldErrors } from '../utils/errors';
 import { validateConfirmPassword, validateEmail, validateNewPassword, validateUsername } from '../utils/validation';
 
@@ -33,6 +34,7 @@ function validateField(name, values) {
 function SignupPage() {
   const navigate = useNavigate();
   const notify = useNotify();
+  usePageTitle('Sign up');
 
   const [values, setValues] = useState(EMPTY);
   const [errors, setErrors] = useState({});

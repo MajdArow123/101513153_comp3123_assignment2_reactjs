@@ -3,9 +3,11 @@ import { Link as RouterLink } from 'react-router-dom';
 import { Button, Paper, Typography } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useAuth } from '../context/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 function NotFoundPage() {
   const { isAuthenticated } = useAuth();
+  usePageTitle('Page not found');
 
   return (
     <Paper sx={{ p: { xs: 3, sm: 5 }, textAlign: 'center', maxWidth: 520, mx: 'auto', mt: 4 }}>

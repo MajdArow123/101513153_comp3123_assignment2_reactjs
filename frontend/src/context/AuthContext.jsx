@@ -15,8 +15,10 @@ const SESSION_EXPIRED_MESSAGE = 'Your session has expired, please log in again';
 function loadInitialSession() {
   const token = getStoredToken();
   if (!token || isTokenExpired(token)) {
+    // Remember whose session expired (see previousUsername below) before clearing it.
+    const expiredUser = token ? getStoredUser() : null;
     clearSession();
-    return { token: null, user: null };
+    return { token: null, user: null, expiredUsername: expiredUser?.username ?? null };
   }
   return { token, user: getStoredUser() };
 }
@@ -27,6 +29,9 @@ export function AuthProvider({ children }) {
   // Kept here rather than in the router's state, because ProtectedRoute also redirects
   // to /login when the session is cleared, and its redirect would replace that state.
   const [logoutMessage, setLogoutMessage] = useState('');
+  // Who was logged in before the last logout. If someone else logs in next, they must
+  // not be sent back to the page the previous user was on (see PublicOnlyRoute).
+  const [previousUsername, setPreviousUsername] = useState(session.expiredUsername ?? null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -42,13 +47,14 @@ export function AuthProvider({ children }) {
   const logout = useCallback(
     (message = '') => {
       clearSession();
+      setPreviousUsername(session.user?.username ?? null);
       setSession({ token: null, user: null });
       setLogoutMessage(message);
       // Remove cached API data, so the next user never sees the previous user's employees.
       queryClient.clear();
       navigate('/login', { replace: true });
     },
-    [navigate, queryClient]
+    [navigate, queryClient, session.user]
   );
 
   // Tell the Axios interceptor what to do when the backend answers 401 (token expired,
@@ -64,8 +70,8 @@ export function AuthProvider({ children }) {
 
   // useMemo: only give consumers a new object when something actually changed.
   const value = useMemo(
-    () => ({ token: session.token, user: session.user, isAuthenticated, logoutMessage, login, logout }),
-    [session, isAuthenticated, logoutMessage, login, logout]
+    () => ({ token: session.token, user: session.user, isAuthenticated, logoutMessage, previousUsername, login, logout }),
+    [session, isAuthenticated, logoutMessage, previousUsername, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

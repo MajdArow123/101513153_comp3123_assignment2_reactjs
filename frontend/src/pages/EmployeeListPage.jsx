@@ -18,6 +18,7 @@ import SearchBar from '../components/SearchBar';
 import { EmptyState, ErrorState } from '../components/StatusViews';
 import { useDeleteEmployee, useEmployeesQuery, useSearchEmployeesQuery } from '../hooks/useEmployees';
 import { useDebounce } from '../hooks/useDebounce';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNotify } from '../context/NotificationContext';
 import { getErrorMessage } from '../utils/errors';
 import { fullName } from '../utils/format';
@@ -27,6 +28,7 @@ const SEARCH_DELAY_MS = 400;
 function EmployeeListPage() {
   const notify = useNotify();
   const [searchParams, setSearchParams] = useSearchParams();
+  usePageTitle('Employees');
 
   // What is typed in the search fields right now (read from the URL).
   const department = searchParams.get('department') ?? '';

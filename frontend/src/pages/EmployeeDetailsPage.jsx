@@ -2,7 +2,7 @@
 // The id comes from the URL (/employees/:id). The backend checks ownership, so typing
 // another user's id here just shows "not found".
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Box, Button, Divider, Link, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import EmployeeNotFound from '../components/EmployeeNotFound';
 import { ErrorState } from '../components/StatusViews';
 import { useDeleteEmployee, useEmployeeQuery } from '../hooks/useEmployees';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNotify } from '../context/NotificationContext';
 import { getErrorMessage, isNotAccessibleError } from '../utils/errors';
 import { formatDate, formatDateTime, formatSalary, fullName } from '../utils/format';
@@ -51,13 +52,22 @@ function DetailsSkeleton() {
 function EmployeeDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const notify = useNotify();
   const { data: employee, isPending, isError, error, refetch } = useEmployeeQuery(id);
   const deleteMutation = useDeleteEmployee();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  let pageTitle = 'Employee details';
+  if (employee) pageTitle = fullName(employee);
+  else if (isNotAccessibleError(error)) pageTitle = 'Employee not found';
+  usePageTitle(pageTitle);
+
+  // The list's search, if the user came from search results (set by EmployeeTable).
+  const listSearch = location.state?.listSearch || '';
+  const listUrl = `/employees${listSearch.startsWith('?') ? listSearch : ''}`;
 
   const backButton = (
-    <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/employees">
+    <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={listUrl}>
       Back to employees
     </Button>
   );
@@ -76,7 +86,7 @@ function EmployeeDetailsPage() {
       onSuccess: () => {
         notify(`${name} was deleted.`);
         // replace: the deleted employee's page shouldn't be reachable with Back.
-        navigate('/employees', { replace: true });
+        navigate(listUrl, { replace: true });
       },
       onError: (err) => {
         setConfirmOpen(false);
@@ -125,6 +135,7 @@ function EmployeeDetailsPage() {
             startIcon={<EditIcon />}
             component={RouterLink}
             to={`/employees/${employee._id}/edit`}
+            state={location.state} // keep the list's search for the way back
             disabled={deleteMutation.isPending}
           >
             Edit

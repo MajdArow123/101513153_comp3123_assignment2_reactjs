@@ -12,6 +12,7 @@ function EmployeeNotFound() {
     <EmptyState
       icon={<PersonOffIcon />}
       title="Employee not found"
+      titleComponent="h1"
       message="This employee doesn't exist or you don't have access to it."
       action={
         <Button variant="contained" component={RouterLink} to="/employees">

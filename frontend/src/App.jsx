@@ -19,9 +19,37 @@ function App() {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Keyboard users can jump past the nav bar straight to the page content.
+          It stays off-screen until it receives focus (the first Tab on any page). */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: 8,
+          top: -48,
+          zIndex: 2000,
+          px: 2,
+          py: 1,
+          bgcolor: 'background.paper',
+          color: 'primary.main',
+          fontWeight: 600,
+          borderRadius: 1,
+          '&:focus': { top: 8 },
+        }}
+      >
+        Skip to main content
+      </Box>
+
       <NavBar />
 
-      <Container component="main" maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, flexGrow: 1 }}>
+      <Container
+        component="main"
+        id="main-content"
+        tabIndex={-1} // lets the skip link move focus here
+        maxWidth="lg"
+        sx={{ py: { xs: 2, sm: 4 }, flexGrow: 1, '&:focus': { outline: 'none' } }}
+      >
         {/* key: a new page gets a fresh boundary, so after an error the user can still navigate away. */}
         <ErrorBoundary key={location.pathname}>
           <Routes>

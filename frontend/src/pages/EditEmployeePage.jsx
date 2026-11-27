@@ -7,6 +7,7 @@ import EmployeeForm from '../components/EmployeeForm';
 import EmployeeNotFound from '../components/EmployeeNotFound';
 import { ErrorState } from '../components/StatusViews';
 import { useEmployeeQuery, useUpdateEmployee } from '../hooks/useEmployees';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNotify } from '../context/NotificationContext';
 import { getErrorMessage, isNotAccessibleError } from '../utils/errors';
 import { getImageUrl } from '../utils/imageUrl';
@@ -33,6 +34,10 @@ function EditEmployeePage() {
   const notify = useNotify();
   const { data: employee, isPending, isError, error, refetch } = useEmployeeQuery(id);
   const updateMutation = useUpdateEmployee(id);
+  let pageTitle = 'Edit employee';
+  if (employee) pageTitle = `Edit ${fullName(employee)}`;
+  else if (isNotAccessibleError(error)) pageTitle = 'Employee not found';
+  usePageTitle(pageTitle);
 
   if (isPending) {
     return (
@@ -53,7 +58,7 @@ function EditEmployeePage() {
   const handleSubmit = async (formData) => {
     const updated = await updateMutation.mutateAsync(formData);
     notify(`${fullName(updated)} was updated.`);
-    navigate(`/employees/${updated._id}`, { replace: true });
+    navigate(`/employees/${updated._id}`, { replace: true, state: location.state });
   };
 
   // Back where the user came from, or to the details page if they opened this URL directly.

@@ -4,11 +4,13 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined';
 
 // Nothing to show yet, e.g. "No employees yet" + an Add button.
-export function EmptyState({ icon, title, message, action }) {
+// titleComponent: 'h1' when this IS the whole page (e.g. "Employee not found"), so the
+// page still has a main heading for screen readers; otherwise a plain paragraph.
+export function EmptyState({ icon, title, message, action, titleComponent = 'p' }) {
   return (
     <Paper variant="outlined" sx={{ p: { xs: 3, sm: 5 }, textAlign: 'center' }}>
       {icon && <Box sx={{ color: 'text.secondary', mb: 1, '& svg': { fontSize: 48 } }}>{icon}</Box>}
-      <Typography variant="h2" component="p">
+      <Typography variant="h2" component={titleComponent}>
         {title}
       </Typography>
       {message && (

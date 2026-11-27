@@ -1,5 +1,5 @@
 // Top navigation bar. Its links depend on whether the user is logged in,
-// and on small screens they collapse into a menu button.
+// and on phones and tablets they collapse into a menu button.
 import { useState } from 'react';
 import { Link as RouterLink, NavLink } from 'react-router-dom';
 import { AppBar, Box, Button, Divider, IconButton, Menu, MenuItem, Toolbar, Typography, useMediaQuery } from '@mui/material';
@@ -8,6 +8,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuth } from '../context/AuthContext';
+import { useNotify } from '../context/NotificationContext';
 
 // Highlights the link of the page we are on (NavLink adds the "active" class).
 const navButtonSx = {
@@ -17,8 +18,10 @@ const navButtonSx = {
 
 function NavBar() {
   const { isAuthenticated, user, logout } = useAuth();
+  const notify = useNotify();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Below 900 px ("md") the links + username don't fit next to the title, so use a menu.
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [menuAnchor, setMenuAnchor] = useState(null);
 
   // `end` on /employees: don't also highlight it while on /employees/add.
@@ -36,6 +39,7 @@ function NavBar() {
   const handleLogout = () => {
     closeMenu();
     logout();
+    notify('You have been logged out.', 'info');
   };
 
   return (
