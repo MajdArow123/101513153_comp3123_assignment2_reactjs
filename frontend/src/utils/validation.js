@@ -54,3 +54,64 @@ export function validateLoginPassword(value) {
   if (value.length > PASSWORD_MAX) return 'Password is too long';
   return '';
 }
+
+// ---- Employee form ----
+// Mirrors backend/src/validators/employee.validators.js and the Employee model.
+
+function requiredText(value, label, max) {
+  const v = value.trim();
+  if (!v) return `${label} is required`;
+  if (v.length > max) return `${label} must be at most ${max} characters`;
+  return '';
+}
+
+export function validateSalary(value) {
+  if (String(value).trim() === '') return 'Salary is required';
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 'Salary must be a number greater than 0';
+  if (n > 1_000_000_000) return 'Salary is too large';
+  return '';
+}
+
+// <input type="date"> gives "YYYY-MM-DD". We also reject impossible dates (e.g. 2024-02-30),
+// like the backend's strict ISO 8601 check.
+export function validateDateOfJoining(value) {
+  if (!value) return 'Date of joining is required';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Enter a valid date';
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return 'Enter a valid date';
+  return '';
+}
+
+// One function for every employee field, so the form can validate by field name.
+export function validateEmployeeField(name, value) {
+  switch (name) {
+    case 'first_name':
+      return requiredText(value, 'First name', 50);
+    case 'last_name':
+      return requiredText(value, 'Last name', 50);
+    case 'email':
+      return validateEmail(value);
+    case 'position':
+      return requiredText(value, 'Position', 100);
+    case 'department':
+      return requiredText(value, 'Department', 100);
+    case 'salary':
+      return validateSalary(value);
+    case 'date_of_joining':
+      return validateDateOfJoining(value);
+    default:
+      return '';
+  }
+}
+
+// ---- Profile picture ----
+// Same limits as the backend's upload middleware (UPLOAD_MAX_MB defaults to 2).
+export const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const PICTURE_MAX_MB = 2;
+
+export function validatePictureFile(file) {
+  if (!PICTURE_TYPES.includes(file.type)) return 'Profile picture must be a JPEG, PNG or WebP image';
+  if (file.size > PICTURE_MAX_MB * 1024 * 1024) return `Profile picture must be ${PICTURE_MAX_MB} MB or smaller`;
+  return '';
+}

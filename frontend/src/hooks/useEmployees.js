@@ -5,7 +5,7 @@
 //   ['employees', 'search', params]  -> search results (Phase 9)
 //   ['employee', id]                 -> one employee
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteEmployee, getEmployee, listEmployees } from '../api/employees.api';
+import { createEmployee, deleteEmployee, getEmployee, listEmployees, updateEmployee } from '../api/employees.api';
 
 export function useEmployeesQuery() {
   return useQuery({ queryKey: ['employees'], queryFn: listEmployees });
@@ -25,6 +25,30 @@ export function useDeleteEmployee() {
       // and any search results are refetched without the deleted employee.
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.removeQueries({ queryKey: ['employee', employee._id] });
+    },
+  });
+}
+
+export function useCreateEmployee() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (formData) => createEmployee(formData),
+    onSuccess: (employee) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] }); // list + search results
+      queryClient.setQueryData(['employee', employee._id], employee); // details page opens instantly
+    },
+  });
+}
+
+export function useUpdateEmployee(id) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (formData) => updateEmployee(id, formData),
+    onSuccess: (employee) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.setQueryData(['employee', id], employee); // the server's updated version
     },
   });
 }
